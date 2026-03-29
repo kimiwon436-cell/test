@@ -2,70 +2,68 @@ import random
 import time
 
 def start_game():
-    item_level = 0
-    gold = 1000
-    is_broken = False
+    lv, gold = 0, 500  # 초기 레벨과 골드
+    weps = ["목검", "철검", "은검", "황금검", "광선검", "전설의 검"]
+    w_idx = 0
+    
+    print("=== 🛠️ 무기 강화 시뮬레이터 ===")
+    print("성공하면 레벨 업! 실패하면 하락이나 파괴! 판매(n)로 돈을 버세요.")
 
-    print("=== 🛠️ 본격 전설의 검 강화 노가다 ===\n")
-    print("목표: +15강 검을 만들어 은퇴하세요!")
-    print("주의: +6부터는 하락 위험, +11부터는 파괴 위험이 있습니다.")
+    while True:
+        cur_w = weps[w_idx]
+        # 강화 비용과 판매 가격 계산
+        cost = 100 + (lv * 60)
+        sell_price = (lv * 150) + (lv**2 * 50) + 100
+        # 성공 확률 계산
+        if lv < 5: suc = 90 - (lv * 10)
+        elif lv < 10: suc = 40 - (lv - 5) * 5
+        else: suc = max(1, 15 - (lv - 10) * 2)
 
-    while not is_broken:
-        print(f"\n[현재 상태] 아이템: +{item_level} 전설의 검 | 보유 골드: {gold}G")
+        print(f"\n[+{lv} {cur_w}] | 보유 골드: {gold}G")
+        print(f"1. 강화(y): {cost}G (확률: {suc}%)")
+        print(f"2. 판매(n): +{sell_price}G 획득 (0강 초기화)")
+        print(f"3. 무기변경(c) | 종료(q)")
         
-        # 레벨별 강화 비용 및 성공 확률 설정
-        cost = 100 + (item_level * 50)
-        
-        if item_level < 5: success_rate = 90 - (item_level * 10) # 1~5강: 90%~50%
-        elif item_level < 10: success_rate = 40 - (item_level - 5) * 5 # 6~10강: 40%~20%
-        else: success_rate = max(1, 15 - (item_level - 10) * 2) # 11강~: 15%~최소 1%
-
-        print(f"강화 비용: {cost}G | 성공 확률: {success_rate}%")
-        choice = input("강화하시겠습니까? (y/n / 종료: q): ").lower()
+        choice = input("선택: ").lower()
 
         if choice == 'q':
-            print(f"\n최종 +{item_level}강에서 멈췄습니다. 수고하셨습니다!")
+            print("게임을 종료합니다.")
             break
-        if choice != 'y': continue
+        
+        elif choice == 'n':
+            gold += sell_price
+            print(f"💰 {cur_w}를 판매하여 {sell_price}G를 벌었습니다!")
+            lv = 0 # 판매 후 초기화
+            
+        elif choice == 'c':
+            w_idx = (w_idx + 1) % len(weps)
+            print(f"🔄 무기를 [{weps[w_idx]}] (으)로 바꿨습니다!")
 
-        if gold < cost:
-            print("❌ 골드가 부족합니다! 사냥(n)을 해서 돈을 벌어오세요.")
-            action = input("사냥하러 갈까요? (y/n): ")
-            if action == 'y':
-                earned = random.randint(200, 500)
-                gold += earned
-                print(f"⚔️ 사냥 완료! {earned}G를 벌었습니다.")
-            continue
-
-        # 강화 진행
-        gold -= cost
-        print("강화 시도 중...", end="", flush=True)
-        for _ in range(3):
-            time.sleep(0.4)
-            print(".", end="", flush=True)
-        print()
-
-        roll = random.randint(1, 100)
-        if roll <= success_rate:
-            item_level += 1
-            print(f"✨ [성공] 아이템이 +{item_level}강이 되었습니다! ✨")
-            if item_level >= 15:
-                print("\n🎉 축하합니다! +15강 전설의 검을 완성하여 게임을 클리어했습니다! 🎉")
-                break
-        else:
-            # 실패 패널티
-            if item_level >= 10: # 10강 이상에서 실패 시 20% 확률로 파괴
-                if random.random() < 0.2:
-                    print("💥 [파괴] 아이템이 형체를 알아볼 수 없게 박살 났습니다... 게임 오버.")
-                    is_broken = True
-                else:
-                    item_level -= 1
-                    print(f"❌ [실패] 강화 실패! 단계가 미끄러져 +{item_level}이 되었습니다.")
-            elif item_level >= 5: # 5강 이상에서 실패 시 단계 하락
-                item_level -= 1
-                print(f"❌ [실패] 강화 실패! 단계가 미끄러져 +{item_level}이 되었습니다.")
+        elif choice == 'y':
+            if gold < cost:
+                print("❌ 골드가 부족합니다! 무기를 판매해서 돈을 버세요.")
+                continue
+            
+            gold -= cost
+            print("강화 시도 중.", end="")
+            for _ in range(2): time.sleep(0.4); print(".", end="", flush=True)
+            
+            if random.randint(1, 100) <= suc:
+                lv += 1
+                print(f"\n✨ 성공! [+{lv} {cur_w}]가 되었습니다!")
+                if lv == 15: print("🎊 축하합니다! 최종 단계 달성! 🎊")
             else:
-                print("❌ [실패] 강화에 실패했지만, 다행히 단계는 유지되었습니다.")
+                print("\n❌ 실패!", end=" ")
+                if lv >= 10 and random.random() < 0.15:
+                    print("💥 아이템이 파괴되었습니다! (0강 초기화)")
+                    lv = 0
+                elif lv >= 5:
+                    lv -= 1
+                    print("단계가 하락했습니다. (-1)")
+                else:
+                    print("다행히 단계가 유지되었습니다.")
+        else:
+            print("잘못된 입력입니다.")
 
 if __name__ == "__main__":
     start_game()
