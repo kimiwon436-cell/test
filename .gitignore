@@ -1,207 +1,85 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[codz]
-*$py.class
+import random
 
-# C extensions
-*.so
+def print_board(board, revealed):
+    size = len(board)
+    # 열 번호 출력
+    print("   " + " ".join(str(i) for i in range(size)))
+    print("  " + "-" * (size * 2 + 1))
+    
+    for r in range(size):
+        row_str = f"{r} |" # 행 번호
+        for c in range(size):
+            if revealed[r][c]:
+                # 지뢰가 없는 빈 공간(0)은 빈칸으로 표시
+                row_str += ("  " if board[r][c] == 0 else str(board[r][c]) + " ")
+            else:
+                row_str += "■ " # 아직 안 열어본 칸
+        print(row_str)
+    print()
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+def place_mines(size, num_mines):
+    board = [[0 for _ in range(size)] for _ in range(size)]
+    # 지뢰 랜덤 배치
+    mines = random.sample([(r, c) for r in range(size) for c in range(size)], num_mines)
+    
+    for r, c in mines:
+        board[r][c] = '*'
+        # 주변 8칸에 숫자 1씩 증가
+        for dr in [-1, 0, 1]:
+            for dc in [-1, 0, 1]:
+                if 0 <= r+dr < size and 0 <= c+dc < size and board[r+dr][c+dc] != '*':
+                    board[r+dr][c+dc] += 1
+    return board, mines
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
+def reveal(board, revealed, r, c):
+    # 보드 밖을 벗어나거나 이미 열린 칸이면 중단
+    if r < 0 or r >= len(board) or c < 0 or c >= len(board) or revealed[r][c]: 
+        return
+    
+    revealed[r][c] = True
+    
+    # 빈칸(0)이면 주변 8칸도 연쇄적으로 열기
+    if board[r][c] == 0:
+        for dr in [-1, 0, 1]:
+            for dc in [-1, 0, 1]:
+                reveal(board, revealed, r+dr, c+dc)
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+def play_minesweeper(size=8, num_mines=10):
+    board, mines = place_mines(size, num_mines)
+    revealed = [[False for _ in range(size)] for _ in range(size)]
+    safe_cells = size * size - num_mines # 지뢰가 아닌 안전한 칸의 수
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py.cover
-.hypothesis/
-.pytest_cache/
-cover/
+    print("\n=== 터미널 지뢰찾기 게임에 오신 것을 환영합니다! ===")
+    
+    while True:
+        print_board(board, revealed)
+        
+        # 승리 조건 체크
+        revealed_count = sum(row.count(True) for row in revealed)
+        if revealed_count == safe_cells:
+            print("🎉 축하합니다! 모든 지뢰를 피했습니다! 🎉")
+            break
 
-# Translations
-*.mo
-*.pot
+        try:
+            user_input = input("열어볼 좌표를 입력하세요 (행 열, 예: 2 3) : ")
+            r, c = map(int, user_input.split())
+            if not (0 <= r < size and 0 <= c < size):
+                print("⚠️ 보드 밖의 좌표입니다. 다시 입력해주세요.\n")
+                continue
+        except ValueError:
+            print("⚠️ 숫자 두 개를 띄어쓰기로 입력해주세요. (예: 2 3)\n")
+            continue
 
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
+        if (r, c) in mines:
+            # 지뢰를 밟았을 때 모든 지뢰 공개
+            for mr, mc in mines:
+                revealed[mr][mc] = True
+            print_board(board, revealed)
+            print("💥 앗! 지뢰를 밟았습니다! 게임 오버. 💥")
+            break
 
-# Flask stuff:
-instance/
-.webassets-cache
+        if not revealed[r][c]:
+            reveal(board, revealed, r, c)
 
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-.pybuilder/
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
-
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# UV
-#   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#uv.lock
-
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
-#poetry.toml
-
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#   pdm recommends including project-wide configuration in pdm.toml, but excluding .pdm-python.
-#   https://pdm-project.org/en/latest/usage/project/#working-with-version-control
-#pdm.lock
-#pdm.toml
-.pdm-python
-.pdm-build/
-
-# pixi
-#   Similar to Pipfile.lock, it is generally recommended to include pixi.lock in version control.
-#pixi.lock
-#   Pixi creates a virtual environment in the .pixi directory, just like venv module creates one
-#   in the .venv directory. It is recommended not to include this directory in version control.
-.pixi
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.envrc
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
-
-# Abstra
-# Abstra is an AI-powered process automation framework.
-# Ignore directories containing user credentials, local state, and settings.
-# Learn more at https://abstra.io/docs
-.abstra/
-
-# Visual Studio Code
-#  Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore 
-#  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
-#  and can be added to the global gitignore or merged into this file. However, if you prefer, 
-#  you could uncomment the following to ignore the entire vscode folder
-# .vscode/
-
-# Ruff stuff:
-.ruff_cache/
-
-# PyPI configuration file
-.pypirc
-
-# Cursor
-#  Cursor is an AI-powered code editor. `.cursorignore` specifies files/directories to
-#  exclude from AI features like autocomplete and code analysis. Recommended for sensitive data
-#  refer to https://docs.cursor.com/context/ignore-files
-.cursorignore
-.cursorindexingignore
-
-# Marimo
-marimo/_static/
-marimo/_lsp/
-__marimo__/
+if __name__ == "__main__":
+    play_minesweeper()
