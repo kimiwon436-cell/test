@@ -1,72 +1,126 @@
-import tkinter as tk
 import random
+import time
+import os
+import sys
+import threading
 
-class DinoGame:
-    def __init__(self):
-        self.root = tk.Tk()
-        self.root.title("Dino Run (Space: Jump)")
-        self.canvas = tk.Canvas(self.root, width=600, height=200, bg='white')
-        self.canvas.pack()
+# 터미널 화면을 지우는 함수 (윈도우/맥/리눅스 호환)
+def clear():
+    os.system('cls' if os.name == 'nt' else 'clear')
 
-        # 공룡(초록색)과 점수 설정
-        self.dino = self.canvas.create_rectangle(50, 150, 80, 180, fill='green')
-        self.score = 0
-        self.score_text = self.canvas.create_text(550, 20, text="Score: 0")
+# 키입력을 비동기로 받기 위한 변수
+key_input = None
+
+def get_input():
+    global key_input
+    # 운영체제별 키 입력 방식 처리 (윈도우: msvcrt, 맥/리눅스: sys.stdin)
+    if os.name == 'nt':
+        import msvcrt
+        while True:
+            if msvcrt.kbhit():
+                key_input = msvcrt.getch().decode().lower()
+    else:
+        import tty, termios
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            while True:
+                key_input = sys.stdin.read(1).lower()
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+def game():
+    global key_input
+    WIDTH = 50       # 게임 화면 너비
+    HEIGHT = 12      # 게임 화면 높이
+    DINO_Y = HEIGHT - 2 # 공룡의 기본 땅 높이
+    
+    # 공룡 애니메이션 프레임 (달리는 모습)
+    dino_frames = ["🦖", "🐉"] 
+    dino_jump = "🦅" # 점프할 때 모습
+    dino_dead = "💥" # 부딪혔을 때 모습
+
+    dino_pos = DINO_Y
+    jump_timer = 0
+    obstacles = []
+    score = 0
+    frame_count = 0
+    game_over = False
+
+    # 키 입력 스레드 시작
+    input_thread = threading.Thread(target=get_input, daemon=True)
+    input_thread.start()
+
+    print("\n=== 🦖 터미널 공룡 달리기 ===\n")
+    print("스페이스바(Space)나 'j' 키를 눌러 점프하세요!")
+    print("준비되면 엔터(Enter)를 누르세요...")
+    input()
+    clear()
+
+    while not game_over:
+        frame_count += 1
         
-        self.obstacles = []
-        self.v_y = 0  # 세로 속도
-        self.is_jumping = False
-        self.game_over = False
+        # 1. 점프 로직 처리
+        if (key_input == ' ' or key_input == 'j') and dino_pos == DINO_Y:
+            jump_timer = 5 # 점프 높이/시간
+            key_input = None # 입력 초기화
 
-        self.root.bind("<space>", self.jump)
-        self.update()
-        self.spawn_obstacle()
-        self.root.mainloop()
+        if jump_timer > 0:
+            dino_pos = DINO_Y - 3 # 점프 중 위치
+            jump_timer -= 1
+        else:
+            dino_pos = DINO_Y # 땅 위에 위치
 
-    def jump(self, event):
-        if not self.is_jumping and not self.game_over:
-            self.v_y = -15 # 점프 힘
-            self.is_jumping = True
+        # 2. 장애물 생성 및 이동 로직 (레벨 디자인)
+        if frame_count % random.randint(10, 20) == 0:
+            obstacles.append(WIDTH - 2) # 새 장애물을 오른쪽 끝에 생성
+        
+        # 장애물 이동 (왼쪽으로) 및 충돌 체크
+        for i in range(len(obstacles)):
+            obstacles[i] -= 2 # 장애물 속도
+            if obstacles[i] == 2 and dino_pos == DINO_Y:
+                game_over = True # 충돌!
+            if obstacles[i] < 0:
+                score += 10 # 장애물 피하면 점수 획득
+        
+        # 화면 밖으로 나간 장애물 제거
+        obstacles = [o for o in obstacles if o >= 0]
 
-    def spawn_obstacle(self):
-        if not self.game_over:
-            # 장애물 생성 (빨간색)
-            h = random.randint(20, 50)
-            o = self.canvas.create_rectangle(600, 180-h, 620, 180, fill='red')
-            self.obstacles.append(o)
-            # 다음 장애물 생성 간격 랜덤 (1~2초)
-            self.root.after(random.randint(1000, 2000), self.spawn_obstacle)
-
-    def update(self):
-        if not self.game_over:
-            # 중력 적용
-            self.canvas.move(self.dino, 0, self.v_y)
-            d_pos = self.canvas.coords(self.dino)
+        # 3. 화면 그리기 (렌더링)
+        scene = []
+        for y in range(HEIGHT):
+            row = [" "] * WIDTH
+            if y == HEIGHT - 1: # 바닥 그리기
+                row = ["="] * WIDTH
             
-            if d_pos[3] < 180: # 공중에 떠있을 때
-                self.v_y += 1 # 중력 가속도
-            else: # 땅에 닿았을 때
-                self.canvas.coords(self.dino, 50, 150, 80, 180)
-                self.v_y = 0
-                self.is_jumping = False
+            # 장애물(선인장) 그리기
+            for o in obstacles:
+                if 0 <= o < WIDTH and y == DINO_Y:
+                    row[o] = "🌵" 
+            
+            # 공룡 그리기
+            if y == dino_pos:
+                if game_over:
+                    row[2] = dino_dead
+                elif dino_pos < DINO_Y:
+                    row[2] = dino_jump # 점프 중 모습
+                else:
+                    row[2] = dino_frames[frame_count % 2] # 달리는 모습 애니메이션
+            
+            scene.append("".join(row))
 
-            # 장애물 이동 및 충돌 체크
-            for o in self.obstacles[:]:
-                self.canvas.move(o, -7, 0) # 장애물 속도
-                o_pos = self.canvas.coords(o)
-                
-                if o_pos[2] < 0: # 화면 밖으로 나가면 삭제
-                    self.canvas.delete(o)
-                    self.obstacles.remove(o)
-                    self.score += 1
-                    self.canvas.itemconfig(self.score_text, text=f"Score: {self.score}")
+        # 버퍼에 한 번에 출력 (깜빡임 최소화)
+        output = f"\nScore: {score:05}\n"
+        output += "\n".join(scene)
+        sys.stdout.write("\033[H" + output) # 커서를 맨 위로 올려서 덮어쓰기
+        sys.stdout.flush()
 
-                # 충돌 감지 로직
-                if d_pos[2] > o_pos[0] and d_pos[0] < o_pos[2] and d_pos[3] > o_pos[1]:
-                    self.game_over = True
-                    self.canvas.create_text(300, 100, text="GAME OVER", font=("Arial", 25), fill="black")
+        time.sleep(0.1) # 게임 속도 조절
 
-            self.root.after(20, self.update) # 20ms마다 화면 갱신
+    # 게임 오버 화면 출력
+    clear()
+    print(f"\n💥 GAME OVER 💥\n최종 점수: {score}\n")
 
 if __name__ == "__main__":
-    DinoGame()
+    game()
